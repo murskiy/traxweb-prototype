@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TraxWeb — Fleet Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.263.1/font/lucide.min.css" rel="stylesheet" />
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Inter', sans-serif; color: #1a1a2e; background: #f0f2f5; overflow: hidden; }
+
+    /* ===== CSS VARIABLES ===== */
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #dbeafe;
+      --success: #16a34a;
+      --success-light: #dcfce7;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+      --sidebar-width: 380px;
+      --topbar-height: 56px;
+    }
+
+    /* ===== LAYOUT ===== */
+    .app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ===== TOP BAR ===== */
+    .topbar {
+      height: var(--topbar-height);
+      background: #fff;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+    .topbar-logo {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 700; font-size: 18px; color: var(--primary);
+      white-space: nowrap;
+    }
+    .topbar-logo svg { width: 28px; height: 28px; }
+    .topbar-search {
+      flex: 1; max-width: 480px;
+      position: relative;
+    }
+    .topbar-search input {
+      width: 100%;
+      height: 36px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-md);
+      padding: 0 12px 0 36px;
+      font-size: 13px;
+      font-family: inherit;
+      background: var(--gray-50);
+      transition: all 0.15s;
+    }
+    .topbar-search input:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .topbar-search .search-icon {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 16px; color: var(--gray-400);
+    }
+    .topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .topbar-btn {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      border: none; background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gray-600); transition: all 0.15s;
+    }
+    .topbar-btn:hover { background: var(--gray-100); color: var(--gray-800); }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+
+    /* ===== MAIN AREA ===== */
+    .main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid var(--gray-200);
+      display: flex;
+      flex-direction: column;
+      z-index: 500;
+      flex-shrink: 0;
+      transition: transform 0.3s ease;
+    }
+    .sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-width))); margin-right: calc(-1 * var(--sidebar-width)); }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .sidebar-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sidebar-title {
+      font-size: 15px; font-weight: 600; color: var(--gray-800);
+    }
+    .vehicle-count {
+      font-size: 12px; color: var(--gray-500); font-weight: 500;
+      background: var(--gray-100); padding: 2px 8px; border-radius: 10px;
+    }
+    .sidebar-filter {
+      display: flex; gap: 6px;
+    }
+    .filter-chip {
+      padding: 4px 10px; border-radius: 16px;
+      font-size: 12px; font-weight: 500;
+      border: 1px solid var(--gray-200);
+      background: #fff; color: var(--gray-600);
+      cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .filter-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .filter-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .sidebar-search {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .sidebar-search input {
+      width: 100%; height: 32px;
+      border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      padding: 0 10px 0 32px; font-size: 12px; font-family: inherit;
+      background: var(--gray-50);
+    }
+    .sidebar-search input:focus { outline: none; border-color: var(--primary); background: #fff; }
+    .sidebar-search { position: relative; }
+    .sidebar-search .s-icon {
+      position: absolute; left: 26px; top: 50%; transform: translateY(-50%);
+      width: 14px; height: 14px; color: var(--gray-400);
+    }
+
+    /* Vehicle List */
+    .vehicle-list {
+      flex: 1; overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .vehicle-list::-webkit-scrollbar { width: 4px; }
+    .vehicle-list::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 4px; }
+
+    .vehicle-item {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gray-100);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .vehicle-item:hover { background: var(--gray-50); }
+    .vehicle-item.selected { background: var(--primary-light); border-left: 3px solid var(--primary); }
+
+    .vehicle-icon {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .vehicle-icon.moving { background: var(--success-light); color: var(--success); }
+    .vehicle-icon.idle { background: var(--warning-light); color: var(--warning); }
+    .vehicle-icon.blocked { background: var(--danger-light); color: var(--danger); }
+
+    .vehicle-info { flex: 1; min-width: 0; }
+    .vehicle-name { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vehicle-plate { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+    .vehicle-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600; padding: 2px 6px;
+      border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .status-badge.moving { background: var(--success-light); color: var(--success); }
+    .status-badge.idle { background: var(--warning-light); color: #92400e; }
+    .status-badge.blocked { background: var(--danger-light); color: var(--danger); }
+
+    .vehicle-speed { font-size: 11px; color: var(--gray-500); }
+    .vehicle-time { font-size: 10px; color: var(--gray-400); margin-left: auto; white-space: nowrap; }
+
+    /* ===== MAP ===== */
+    .map-container { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+
+    .map-controls {
+      position: absolute; top: 12px; right: 12px; z-index: 400;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .map-ctrl-btn {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      background: #fff; border: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--gray-600);
+      box-shadow: var(--shadow-sm); transition: all 0.15s;
+    }
+    .map-ctrl-btn:hover { background: var(--gray-50); color: var(--gray-800); }
+
+    .sidebar-toggle {
+      position: absolute; top: 12px; left: 12px; z-index: 400;
+    }
+
+    /* ===== DETAIL PANEL ===== */
+    .detail-panel {
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: 400px; background: #fff;
+      box-shadow: var(--shadow-xl);
+      z-index: 600;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .detail-panel.open { transform: translateX(0); }
+
+    .detail-header {
+      padding: 16px; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: flex-start; justify-content: space-between;
+    }
+    .detail-header-info { flex: 1; }
+    .detail-vehicle-name { font-size: 18px; font-weight: 700; color: var(--gray-900); }
+    .detail-vehicle-plate {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 600; color: var(--gray-600);
+      background: var(--gray-100); padding: 2px 8px; border-radius: 4px;
+      margin-top: 4px;
+    }
+    .detail-close {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: none; background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gray-400); transition: all 0.15s;
+    }
+    .detail-close:hover { background: var(--gray-100); color: var(--gray-700); }
+
+    .detail-body { flex: 1; overflow-y: auto; }
+
+    .detail-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .detail-section-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--gray-400); margin-bottom: 10px;
+    }
+
+    .detail-status-card {
+      background: var(--gray-50); border-radius: var(--radius-md);
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .detail-status-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .detail-status-label { font-size: 12px; color: var(--gray-500); }
+    .detail-status-value { font-size: 13px; font-weight: 500; color: var(--gray-800); }
+
+    .detail-info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .detail-info-item {}
+    .detail-info-label { font-size: 11px; color: var(--gray-400); margin-bottom: 2px; }
+    .detail-info-value { font-size: 13px; font-weight: 500; color: var(--gray-800); }
+
+    .detail-location {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: var(--gray-50); border-radius: var(--radius-md); padding: 10px;
+    }
+    .detail-location svg { width: 16px; height: 16px; color: var(--gray-400); flex-shrink: 0; margin-top: 1px; }
+    .detail-location-text { font-size: 12px; color: var(--gray-600); line-height: 1.4; }
+    .detail-location-time { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+    /* Actions */
+    .detail-actions {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .action-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200); background: #fff;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      color: var(--gray-700);
+    }
+    .action-btn:hover { background: var(--gray-50); border-color: var(--gray-300); }
+    .action-btn svg { width: 18px; height: 18px; }
+    .action-btn.danger { border-color: var(--danger); color: var(--danger); }
+    .action-btn.danger:hover { background: var(--danger-light); }
+    .action-btn.danger.active { background: var(--danger); color: #fff; }
+    .action-btn .action-label { flex: 1; }
+    .action-toggle {
+      width: 40px; height: 22px; border-radius: 11px;
+      background: var(--gray-300); position: relative;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .action-toggle::after {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; top: 2px; left: 2px;
+      transition: transform 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .action-toggle.on { background: var(--danger); }
+    .action-toggle.on::after { transform: translateX(18px); }
+
+    /* Reports */
+    .report-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200); background: #fff;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit; width: 100%;
+    }
+    .report-btn:hover { background: var(--gray-50); border-color: var(--primary); }
+    .report-btn svg { width: 18px; height: 18px; color: var(--primary); }
+    .report-btn-text { flex: 1; text-align: left; }
+    .report-btn-title { font-size: 13px; font-weight: 500; color: var(--gray-800); }
+    .report-btn-desc { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+    .report-btn .arrow { color: var(--gray-400); width: 16px; height: 16px; }
+
+    /* ===== REPORT MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 2000;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .modal {
+      background: #fff; border-radius: var(--radius-xl);
+      width: 560px; max-height: 80vh;
+      box-shadow: var(--shadow-xl);
+      display: flex; flex-direction: column;
+      transform: translateY(20px);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; color: var(--gray-900); }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: none; background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gray-400);
+    }
+    .modal-close:hover { background: var(--gray-100); }
+
+    .modal-body { padding: 20px 24px; flex: 1; overflow-y: auto; }
+
+    .date-picker-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    }
+    .date-picker-row label { font-size: 13px; font-weight: 500; color: var(--gray-700); }
+    .date-picker-row input[type="date"] {
+      height: 36px; border: 1px solid var(--gray-300);
+      border-radius: var(--radius-md); padding: 0 10px;
+      font-family: inherit; font-size: 13px; color: var(--gray-800);
+    }
+    .date-picker-row input[type="date"]:focus { outline: none; border-color: var(--primary); }
+
+    .report-table { width: 100%; border-collapse: collapse; }
+    .report-table th {
+      text-align: left; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--gray-500); padding: 8px 12px;
+      border-bottom: 2px solid var(--gray-200);
+    }
+    .report-table td {
+      padding: 10px 12px; font-size: 13px; color: var(--gray-700);
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .report-table tr:hover td { background: var(--gray-50); }
+
+    /* ===== CLUSTER MARKERS ===== */
+    .cluster-marker {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      font-weight: 700; font-size: 14px;
+      border: 3px solid #fff;
+      box-shadow: var(--shadow-md);
+    }
+    .cluster-marker.large { width: 50px; height: 50px; font-size: 16px; }
+
+    /* Custom map markers */
+    .custom-marker {
+      position: relative;
+    }
+    .marker-pin {
+      width: 32px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .marker-pin svg { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+    .marker-label {
+      position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+      white-space: nowrap; font-size: 10px; font-weight: 600;
+      background: rgba(255,255,255,0.95); padding: 1px 6px;
+      border-radius: 3px; box-shadow: var(--shadow-sm);
+      color: var(--gray-700);
+    }
+
+    /* ===== MOBILE STYLES ===== */
+    @media (max-width: 768px) {
+      :root { --sidebar-width: 100%; }
+      .sidebar {
+        position: absolute; top: 0; left: 0; bottom: 0;
+        width: 100%; z-index: 500;
+      }
+      .sidebar.collapsed { transform: translateX(-100%); }
+      .detail-panel { width: 100%; }
+      .topbar-search { max-width: 200px; }
+      .modal { width: 95%; margin: 0 10px; }
+
+      .mobile-bottom-sheet {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: #fff; border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        z-index: 500; max-height: 60vh;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+      }
+      .mobile-bottom-sheet.open { transform: translateY(0); }
+      .bottom-sheet-handle {
+        width: 40px; height: 4px; border-radius: 2px;
+        background: var(--gray-300); margin: 8px auto;
+      }
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 2s infinite; }
+
+    /* Leaflet overrides */
+    .leaflet-control-zoom { border-radius: var(--radius-md) !important; overflow: hidden; }
+    .leaflet-control-zoom a { width: 32px !important; height: 32px !important; line-height: 32px !important; font-size: 16px !important; }
+    .leaflet-popup-content-wrapper { border-radius: var(--radius-md) !important; }
+
+    /* Immobilizer confirmation */
+    .confirm-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 3000; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .confirm-overlay.open { opacity: 1; pointer-events: auto; }
+    .confirm-dialog {
+      background: #fff; border-radius: var(--radius-lg); padding: 24px;
+      width: 380px; box-shadow: var(--shadow-xl); text-align: center;
+    }
+    .confirm-icon { margin-bottom: 12px; }
+    .confirm-title { font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px; }
+    .confirm-text { font-size: 13px; color: var(--gray-500); margin-bottom: 20px; line-height: 1.5; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+    .confirm-btn {
+      padding: 8px 20px; border-radius: var(--radius-md);
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--gray-300);
+      background: #fff; color: var(--gray-700); transition: all 0.15s;
+    }
+    .confirm-btn:hover { background: var(--gray-50); }
+    .confirm-btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .confirm-btn.danger:hover { background: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-logo">
+        <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#2563eb"/><path d="M7 14h14M14 7v14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+        TraxWeb
+      </div>
+      <div class="topbar-search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Search vehicles, locations..." />
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn" title="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <button class="topbar-btn" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <div class="topbar-avatar" title="Admin User">JD</div>
+      </div>
+    </header>
+
+    <div class="main">
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title-row">
+            <span class="sidebar-title">Fleet Vehicles</span>
+            <span class="vehicle-count" id="vehicleCount">24 vehicles</span>
+          </div>
+          <div class="sidebar-filter">
+            <button class="filter-chip active" data-filter="all">All</button>
+            <button class="filter-chip" data-filter="moving">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--success);margin-right:3px;"></span>Moving
+            </button>
+            <button class="filter-chip" data-filter="idle">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warning);margin-right:3px;"></span>Idle
+            </button>
+            <button class="filter-chip" data-filter="blocked">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--danger);margin-right:3px;"></span>Blocked
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-search">
+          <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="vehicleSearch" placeholder="Filter vehicles..." />
+        </div>
+        <div class="vehicle-list" id="vehicleList"></div>
+      </aside>
+
+      <!-- MAP -->
+      <div class="map-container">
+        <div class="sidebar-toggle">
+          <button class="map-ctrl-btn" id="toggleSidebar" title="Toggle vehicle list">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+          </button>
+        </div>
+        <div id="map"></div>
+
+        <!-- DETAIL PANEL -->
+        <div class="detail-panel" id="detailPanel">
+          <div class="detail-header">
+            <div class="detail-header-info">
+              <div class="detail-vehicle-name" id="detailName"></div>
+              <div class="detail-vehicle-plate" id="detailPlate"></div>
+            </div>
+            <button class="detail-close" id="detailClose">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="detail-body">
+            <!-- Status Section -->
+            <div class="detail-section">
+              <div class="detail-section-title">Current Status</div>
+              <div class="detail-status-card">
+                <div class="detail-status-row">
+                  <span class="detail-status-label">State</span>
+                  <span id="detailState"></span>
+                </div>
+                <div class="detail-status-row">
+                  <span class="detail-status-label">Speed</span>
+                  <span class="detail-status-value" id="detailSpeed"></span>
+                </div>
+                <div class="detail-status-row">
+                  <span class="detail-status-label">Last Update</span>
+                  <span class="detail-status-value" id="detailTimestamp"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="detail-section">
+              <div class="detail-section-title">Last Known Location</div>
+              <div class="detail-location">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <div class="detail-location-text" id="detailAddress"></div>
+                  <div class="detail-location-time" id="detailLocationTime"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Vehicle Info -->
+            <div class="detail-section">
+              <div class="detail-section-title">Vehicle Information</div>
+              <div class="detail-info-grid">
+                <div class="detail-info-item">
+                  <div class="detail-info-label">Brand</div>
+                  <div class="detail-info-value" id="detailBrand"></div>
+                </div>
+                <div class="detail-info-item">
+                  <div class="detail-info-label">Model</div>
+                  <div class="detail-info-value" id="detailModel"></div>
+                </div>
+                <div class="detail-info-item">
+                  <div class="detail-info-label">Body Type</div>
+                  <div class="detail-info-value" id="detailBody"></div>
+                </div>
+                <div class="detail-info-item">
+                  <div class="detail-info-label">VIN</div>
+                  <div class="detail-info-value" id="detailVin" style="font-size:11px;"></div>
+                </div>
+                <div class="detail-info-item" style="grid-column: span 2;">
+                  <div class="detail-info-label">License Plate</div>
+                  <div class="detail-info-value" id="detailLicense"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="detail-section">
+              <div class="detail-section-title">Remote Actions</div>
+              <div class="detail-actions">
+                <button class="action-btn danger" id="immobilizerBtn" onclick="toggleImmobilizer()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span class="action-label">Immobilizer (Engine Block)</span>
+                  <div class="action-toggle" id="immobilizerToggle"></div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="detail-section">
+              <div class="detail-section-title">Reports</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <button class="report-btn" onclick="openReport('daily')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <div class="report-btn-text">
+                    <div class="report-btn-title">Daily Report</div>
+                    <div class="report-btn-desc">Trips, distance, duration per day</div>
+                  </div>
+                  <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+                <button class="report-btn" onclick="openReport('status')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  <div class="report-btn-text">
+                    <div class="report-btn-title">Status Report</div>
+                    <div class="report-btn-desc">Engine states, idle time, blocked periods</div>
+                  </div>
+                  <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORT MODAL -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="reportTitle">Daily Report</div>
+        <button class="modal-close" onclick="closeReport()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="date-picker-row">
+          <label>Select Date:</label>
+          <input type="date" id="reportDate" />
+          <span style="font-size:12px;color:var(--gray-500);" id="reportVehicleLabel"></span>
+        </div>
+        <div id="reportContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMMOBILIZER CONFIRM -->
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-dialog">
+      <div class="confirm-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="confirm-title" id="confirmTitle">Enable Engine Block?</div>
+      <div class="confirm-text" id="confirmText">This will remotely block the engine of this vehicle. The vehicle will not be able to start until the block is removed.</div>
+      <div class="confirm-actions">
+        <button class="confirm-btn" onclick="closeConfirm()">Cancel</button>
+        <button class="confirm-btn danger" id="confirmAction" onclick="confirmImmobilizer()">Enable Block</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== VEHICLE DATA =====
+    const vehicles = [
+      { id: 1, name: "Delivery Van #1", plate: "AB-123-CD", brand: "Mercedes-Benz", model: "Sprinter 316", body: "Van", vin: "WDB9066331S123456", license: "AB-123-CD", status: "moving", speed: 67, lat: 50.8503, lng: 4.3517, address: "Rue de la Loi 16, 1000 Brussels, Belgium", lastUpdate: "2 min ago", blocked: false },
+      { id: 2, name: "Truck Alpha", plate: "EF-456-GH", brand: "Volvo", model: "FH16", body: "Truck", vin: "YV2A4C2A5RB654321", license: "EF-456-GH", status: "moving", speed: 82, lat: 50.8798, lng: 4.7005, address: "E40 Highway, Leuven, Belgium", lastUpdate: "1 min ago", blocked: false },
+      { id: 3, name: "Service Car #3", plate: "IJ-789-KL", brand: "Volkswagen", model: "Caddy", body: "Compact Van", vin: "WVWZZZ2KZRP789012", license: "IJ-789-KL", status: "idle", speed: 0, lat: 50.8466, lng: 4.3528, address: "Grand Place 1, 1000 Brussels, Belgium", lastUpdate: "15 min ago", blocked: false },
+      { id: 4, name: "Cargo Truck #2", plate: "MN-012-OP", brand: "DAF", model: "XF 480", body: "Truck", vin: "XLRAE47MS0E012345", license: "MN-012-OP", status: "idle", speed: 0, lat: 51.2194, lng: 4.4025, address: "Grote Markt 7, 2000 Antwerp, Belgium", lastUpdate: "32 min ago", blocked: false },
+      { id: 5, name: "Express Van #5", plate: "QR-345-ST", brand: "Ford", model: "Transit Custom", body: "Van", vin: "WF0XXXGCDXRB34567", license: "QR-345-ST", status: "moving", speed: 54, lat: 51.0543, lng: 3.7174, address: "Korenmarkt 15, 9000 Ghent, Belgium", lastUpdate: "3 min ago", blocked: false },
+      { id: 6, name: "Heavy Hauler #1", plate: "UV-678-WX", brand: "Scania", model: "R500", body: "Truck", vin: "XLER4X20005678901", license: "UV-678-WX", status: "blocked", speed: 0, lat: 50.6292, lng: 5.5797, address: "Place Saint-Lambert, 4000 Liège, Belgium", lastUpdate: "1 hr ago", blocked: true },
+      { id: 7, name: "City Runner #4", plate: "YZ-901-AB", brand: "Renault", model: "Kangoo E-Tech", body: "Compact Van", vin: "VF1FK5BH0RY901234", license: "YZ-901-AB", status: "moving", speed: 38, lat: 50.8270, lng: 4.3650, address: "Avenue Louise 54, 1050 Brussels, Belgium", lastUpdate: "1 min ago", blocked: false },
+      { id: 8, name: "Refrigerated #2", plate: "CD-234-EF", brand: "Iveco", model: "Daily 35S", body: "Refrigerated Van", vin: "ZCFC135A005234567", license: "CD-234-EF", status: "moving", speed: 71, lat: 50.4542, lng: 3.9566, address: "N56 Highway, Mons, Belgium", lastUpdate: "2 min ago", blocked: false },
+      { id: 9, name: "Flatbed #3", plate: "GH-567-IJ", brand: "MAN", model: "TGX 18.510", body: "Flatbed Truck", vin: "WMAN08ZZ1RY567890", license: "GH-567-IJ", status: "idle", speed: 0, lat: 50.4669, lng: 4.8675, address: "Rue de Fer 22, 5000 Namur, Belgium", lastUpdate: "45 min ago", blocked: false },
+      { id: 10, name: "Pickup #1", plate: "KL-890-MN", brand: "Toyota", model: "Hilux", body: "Pickup", vin: "AHTFR22G507890123", license: "KL-890-MN", status: "moving", speed: 45, lat: 50.9307, lng: 4.0400, address: "Brusselsesteenweg 120, Aalst, Belgium", lastUpdate: "4 min ago", blocked: false },
+      { id: 11, name: "Tanker #1", plate: "OP-123-QR", brand: "Mercedes-Benz", model: "Actros 2545", body: "Tanker", vin: "WDB9634031L123789", license: "OP-123-QR", status: "idle", speed: 0, lat: 51.3233, lng: 3.1859, address: "Haven 1234, 8380 Zeebrugge, Belgium", lastUpdate: "1 hr ago", blocked: false },
+      { id: 12, name: "Courier #6", plate: "ST-456-UV", brand: "Peugeot", model: "Partner", body: "Compact Van", vin: "VR3EFYHYRRJ456012", license: "ST-456-UV", status: "blocked", speed: 0, lat: 50.8389, lng: 4.3667, address: "Rue Neuve 111, 1000 Brussels, Belgium", lastUpdate: "2 hr ago", blocked: true },
+      { id: 13, name: "Logistics #7", plate: "WX-789-YZ", brand: "Volvo", model: "FM 420", body: "Box Truck", vin: "YV2H4C1A1RB789345", license: "WX-789-YZ", status: "moving", speed: 88, lat: 50.7500, lng: 4.0300, address: "E19 Highway, Halle, Belgium", lastUpdate: "1 min ago", blocked: false },
+      { id: 14, name: "Maintenance Van #2", plate: "AB-012-CD", brand: "Citroën", model: "Berlingo", body: "Van", vin: "VR7EAYHYRRN012678", license: "AB-012-CD", status: "idle", speed: 0, lat: 50.9500, lng: 3.1200, address: "Markt 1, 8000 Bruges, Belgium", lastUpdate: "20 min ago", blocked: false },
+      { id: 15, name: "Dump Truck #1", plate: "EF-345-GH", brand: "Caterpillar", model: "CT660", body: "Dump Truck", vin: "CAT0CT66005345901", license: "EF-345-GH", status: "moving", speed: 35, lat: 50.4106, lng: 4.4447, address: "Route de Mons, Charleroi, Belgium", lastUpdate: "5 min ago", blocked: false },
+      { id: 16, name: "Delivery Van #8", plate: "IJ-678-KL", brand: "Mercedes-Benz", model: "Vito 116", body: "Van", vin: "WDF44760315678234", license: "IJ-678-KL", status: "moving", speed: 52, lat: 50.8600, lng: 4.3400, address: "Chaussée de Louvain 42, Brussels", lastUpdate: "2 min ago", blocked: false },
+      { id: 17, name: "Crane Truck #1", plate: "MN-901-OP", brand: "Liebherr", model: "LTM 1060", body: "Crane Truck", vin: "WLH1LTM10605901567", license: "MN-901-OP", status: "idle", speed: 0, lat: 50.6050, lng: 5.5700, address: "Quai de Rome 2, 4000 Liège, Belgium", lastUpdate: "3 hr ago", blocked: false },
+      { id: 18, name: "Electric Van #1", plate: "QR-234-ST", brand: "Nissan", model: "e-NV200", body: "Electric Van", vin: "SJNFBANE5R0234890", license: "QR-234-ST", status: "moving", speed: 42, lat: 50.8350, lng: 4.3350, address: "Rue du Midi 18, 1000 Brussels", lastUpdate: "1 min ago", blocked: false },
+      { id: 19, name: "Tow Truck #2", plate: "UV-567-WX", brand: "Isuzu", model: "NQR", body: "Tow Truck", vin: "JAANQR71507567123", license: "UV-567-WX", status: "idle", speed: 0, lat: 50.8200, lng: 4.4000, address: "Chaussée de Wavre 800, Etterbeek", lastUpdate: "55 min ago", blocked: false },
+      { id: 20, name: "Box Truck #4", plate: "YZ-890-AB", brand: "Fuso", model: "Canter 7C18", body: "Box Truck", vin: "TYBBT710505890456", license: "YZ-890-AB", status: "moving", speed: 63, lat: 50.7800, lng: 4.5100, address: "N4 Highway, Wavre, Belgium", lastUpdate: "3 min ago", blocked: false },
+      { id: 21, name: "Minibus #1", plate: "CD-123-EF", brand: "Mercedes-Benz", model: "Sprinter 519", body: "Minibus", vin: "WDB9066351S123789", license: "CD-123-EF", status: "idle", speed: 0, lat: 51.2100, lng: 4.4200, address: "Meir 48, 2000 Antwerp, Belgium", lastUpdate: "10 min ago", blocked: false },
+      { id: 22, name: "Tipper #2", plate: "GH-456-IJ", brand: "Scania", model: "P410", body: "Tipper Truck", vin: "XLER4X20005456234", license: "GH-456-IJ", status: "moving", speed: 47, lat: 50.6800, lng: 4.3600, address: "N5 Highway, Waterloo, Belgium", lastUpdate: "2 min ago", blocked: false },
+      { id: 23, name: "Ambulance #1", plate: "KL-789-MN", brand: "Ford", model: "Transit", body: "Ambulance", vin: "WF0XXXGCDXRB78901", license: "KL-789-MN", status: "moving", speed: 95, lat: 50.8550, lng: 4.3700, address: "Rue Belliard 135, Brussels", lastUpdate: "just now", blocked: false },
+      { id: 24, name: "Waste Truck #1", plate: "OP-012-QR", brand: "Dennis Eagle", model: "Elite 6", body: "Waste Truck", vin: "SDE6ELITE05012345", license: "OP-012-QR", status: "blocked", speed: 0, lat: 51.0300, lng: 3.7300, address: "Dok Noord 4, 9000 Ghent, Belgium", lastUpdate: "4 hr ago", blocked: true },
+    ];
+
+    // ===== STATE =====
+    let selectedVehicle = null;
+    let currentFilter = 'all';
+    let markers = {};
+    let map;
+
+    // ===== INIT MAP =====
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([50.85, 4.35], 8);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19
+      }).addTo(map);
+
+      vehicles.forEach(v => addMarker(v));
+    }
+
+    function getMarkerColor(status) {
+      if (status === 'moving') return '#16a34a';
+      if (status === 'idle') return '#f59e0b';
+      return '#dc2626';
+    }
+
+    function createMarkerIcon(vehicle) {
+      const color = getMarkerColor(vehicle.status);
+      const svg = `<svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${color}"/>
+        <circle cx="16" cy="15" r="7" fill="white" opacity="0.9"/>
+        <path d="M11 17h10l-1-4h-1l-1-2h-4l-1 2h-1l-1 4zm2-3h6" stroke="${color}" stroke-width="1.5" fill="none"/>
+      </svg>`;
+      return L.divIcon({
+        html: svg,
+        className: 'custom-marker',
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -40]
+      });
+    }
+
+    function addMarker(vehicle) {
+      const marker = L.marker([vehicle.lat, vehicle.lng], { icon: createMarkerIcon(vehicle) });
+      marker.bindTooltip(vehicle.name, { direction: 'top', offset: [0, -42], className: 'marker-tooltip' });
+      marker.on('click', () => selectVehicle(vehicle.id));
+      marker.addTo(map);
+      markers[vehicle.id] = marker;
+    }
+
+    // ===== VEHICLE LIST =====
+    function renderVehicleList() {
+      const list = document.getElementById('vehicleList');
+      const search = document.getElementById('vehicleSearch').value.toLowerCase();
+      const filtered = vehicles.filter(v => {
+        const matchFilter = currentFilter === 'all' || v.status === currentFilter;
+        const matchSearch = v.name.toLowerCase().includes(search) || v.plate.toLowerCase().includes(search) || v.brand.toLowerCase().includes(search);
+        return matchFilter && matchSearch;
+      });
+
+      document.getElementById('vehicleCount').textContent = `${filtered.length} vehicle${filtered.length !== 1 ? 's' : ''}`;
+
+      list.innerHTML = filtered.map(v => `
+        <div class="vehicle-item ${selectedVehicle === v.id ? 'selected' : ''}" onclick="selectVehicle(${v.id})">
+          <div class="vehicle-icon ${v.status}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              ${v.status === 'blocked'
+                ? '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+                : '<path d="M5 17h14M5 17a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2M7 17a2 2 0 1 0 4 0M13 17a2 2 0 1 0 4 0"/>'}
+            </svg>
+          </div>
+          <div class="vehicle-info">
+            <div class="vehicle-name">${v.name}</div>
+            <div class="vehicle-plate">${v.plate} · ${v.brand} ${v.model}</div>
+            <div class="vehicle-meta">
+              <span class="status-badge ${v.status}">
+                <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+                ${v.status === 'blocked' ? 'Engine Blocked' : v.status}
+              </span>
+              ${v.speed > 0 ? `<span class="vehicle-speed">${v.speed} km/h</span>` : ''}
+            </div>
+          </div>
+          <span class="vehicle-time">${v.lastUpdate}</span>
+        </div>
+      `).join('');
+    }
+
+    // ===== SELECT VEHICLE =====
+    function selectVehicle(id) {
+      selectedVehicle = id;
+      const v = vehicles.find(x => x.id === id);
+      if (!v) return;
+
+      // Update list
+      renderVehicleList();
+
+      // Fly to marker
+      map.flyTo([v.lat, v.lng], 14, { duration: 0.8 });
+
+      // Highlight marker
+      Object.values(markers).forEach((m, i) => {
+        const vid = vehicles[i]?.id;
+        if (vid) m.setIcon(createMarkerIcon(vehicles.find(x => x.id === vid)));
+      });
+
+      // Bounce selected marker
+      const marker = markers[id];
+      if (marker) {
+        const icon = marker.getIcon();
+        marker.setZIndexOffset(1000);
+      }
+
+      // Open detail panel
+      openDetailPanel(v);
+    }
+
+    function openDetailPanel(v) {
+      document.getElementById('detailName').textContent = v.name;
+      document.getElementById('detailPlate').textContent = v.license;
+      document.getElementById('detailState').innerHTML = `<span class="status-badge ${v.status}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span> ${v.status === 'blocked' ? 'Engine Blocked' : v.status.charAt(0).toUpperCase() + v.status.slice(1)}</span>`;
+      document.getElementById('detailSpeed').textContent = v.speed > 0 ? `${v.speed} km/h` : '0 km/h (stationary)';
+      document.getElementById('detailTimestamp').textContent = v.lastUpdate;
+      document.getElementById('detailAddress').textContent = v.address;
+      document.getElementById('detailLocationTime').textContent = `Updated ${v.lastUpdate}`;
+      document.getElementById('detailBrand').textContent = v.brand;
+      document.getElementById('detailModel').textContent = v.model;
+      document.getElementById('detailBody').textContent = v.body;
+      document.getElementById('detailVin').textContent = v.vin;
+      document.getElementById('detailLicense').textContent = v.license;
+
+      // Immobilizer state
+      const toggle = document.getElementById('immobilizerToggle');
+      toggle.className = `action-toggle ${v.blocked ? 'on' : ''}`;
+      const btn = document.getElementById('immobilizerBtn');
+      btn.className = `action-btn danger ${v.blocked ? 'active' : ''}`;
+
+      document.getElementById('detailPanel').classList.add('open');
+    }
+
+    function closeDetailPanel() {
+      document.getElementById('detailPanel').classList.remove('open');
+      selectedVehicle = null;
+      renderVehicleList();
+    }
+
+    // ===== IMMOBILIZER =====
+    function toggleImmobilizer() {
+      const v = vehicles.find(x => x.id === selectedVehicle);
+      if (!v) return;
+
+      const isBlocking = !v.blocked;
+      document.getElementById('confirmTitle').textContent = isBlocking ? 'Enable Engine Block?' : 'Disable Engine Block?';
+      document.getElementById('confirmText').textContent = isBlocking
+        ? `This will remotely block the engine of "${v.name}". The vehicle will not be able to start until the block is removed.`
+        : `This will remove the engine block from "${v.name}". The vehicle will be able to start normally.`;
+      document.getElementById('confirmAction').textContent = isBlocking ? 'Enable Block' : 'Disable Block';
+      document.getElementById('confirmAction').className = isBlocking ? 'confirm-btn danger' : 'confirm-btn';
+      document.getElementById('confirmAction').style.background = isBlocking ? '' : 'var(--success)';
+      document.getElementById('confirmAction').style.color = isBlocking ? '' : '#fff';
+      document.getElementById('confirmAction').style.borderColor = isBlocking ? '' : 'var(--success)';
+
+      document.getElementById('confirmOverlay').classList.add('open');
+    }
+
+    function confirmImmobilizer() {
+      const v = vehicles.find(x => x.id === selectedVehicle);
+      if (!v) return;
+
+      v.blocked = !v.blocked;
+      v.status = v.blocked ? 'blocked' : 'idle';
+      v.speed = 0;
+
+      // Update marker
+      markers[v.id].setIcon(createMarkerIcon(v));
+
+      // Update detail panel
+      openDetailPanel(v);
+      renderVehicleList();
+      closeConfirm();
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirmOverlay').classList.remove('open');
+    }
+
+    // ===== REPORTS =====
+    function openReport(type) {
+      const v = vehicles.find(x => x.id === selectedVehicle);
+      if (!v) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('reportDate').value = today;
+      document.getElementById('reportVehicleLabel').textContent = `Vehicle: ${v.name}`;
+
+      if (type === 'daily') {
+        document.getElementById('reportTitle').textContent = 'Daily Report';
+        document.getElementById('reportContent').innerHTML = `
+          <table class="report-table">
+            <thead>
+              <tr><th>Trip</th><th>Start</th><th>End</th><th>Distance</th><th>Duration</th><th>Avg Speed</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td>07:15</td><td>08:42</td><td>45.2 km</td><td>1h 27m</td><td>31 km/h</td></tr>
+              <tr><td>2</td><td>09:30</td><td>10:15</td><td>22.8 km</td><td>45m</td><td>30 km/h</td></tr>
+              <tr><td>3</td><td>11:00</td><td>12:35</td><td>67.1 km</td><td>1h 35m</td><td>42 km/h</td></tr>
+              <tr><td>4</td><td>13:45</td><td>15:20</td><td>53.4 km</td><td>1h 35m</td><td>34 km/h</td></tr>
+              <tr><td>5</td><td>16:00</td><td>17:10</td><td>38.9 km</td><td>1h 10m</td><td>33 km/h</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:16px;padding:12px;background:var(--gray-50);border-radius:var(--radius-md);display:flex;gap:24px;">
+            <div><div style="font-size:11px;color:var(--gray-500);">Total Distance</div><div style="font-size:16px;font-weight:600;">227.4 km</div></div>
+            <div><div style="font-size:11px;color:var(--gray-500);">Total Duration</div><div style="font-size:16px;font-weight:600;">6h 32m</div></div>
+            <div><div style="font-size:11px;color:var(--gray-500);">Trips</div><div style="font-size:16px;font-weight:600;">5</div></div>
+            <div><div style="font-size:11px;color:var(--gray-500);">Avg Speed</div><div style="font-size:16px;font-weight:600;">34.8 km/h</div></div>
+          </div>
+        `;
+      } else {
+        document.getElementById('reportTitle').textContent = 'Status Report';
+        document.getElementById('reportContent').innerHTML = `
+          <table class="report-table">
+            <thead>
+              <tr><th>Time</th><th>Status</th><th>Duration</th><th>Location</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>07:15</td><td><span class="status-badge moving">Moving</span></td><td>1h 27m</td><td>Brussels → Leuven</td></tr>
+              <tr><td>08:42</td><td><span class="status-badge idle">Idle</span></td><td>48m</td><td>Leuven, Naamsestraat</td></tr>
+              <tr><td>09:30</td><td><span class="status-badge moving">Moving</span></td><td>45m</td><td>Leuven → Mechelen</td></tr>
+              <tr><td>10:15</td><td><span class="status-badge idle">Idle</span></td><td>45m</td><td>Mechelen, Grote Markt</td></tr>
+              <tr><td>11:00</td><td><span class="status-badge moving">Moving</span></td><td>1h 35m</td><td>Mechelen → Antwerp</td></tr>
+              <tr><td>12:35</td><td><span class="status-badge idle">Idle</span></td><td>1h 10m</td><td>Antwerp, Haven</td></tr>
+              <tr><td>13:45</td><td><span class="status-badge moving">Moving</span></td><td>1h 35m</td><td>Antwerp → Ghent</td></tr>
+              <tr><td>15:20</td><td><span class="status-badge idle">Idle</span></td><td>40m</td><td>Ghent, Korenmarkt</td></tr>
+              <tr><td>16:00</td><td><span class="status-badge moving">Moving</span></td><td>1h 10m</td><td>Ghent → Brussels</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:16px;padding:12px;background:var(--gray-50);border-radius:var(--radius-md);display:flex;gap:24px;">
+            <div><div style="font-size:11px;color:var(--gray-500);">Moving Time</div><div style="font-size:16px;font-weight:600;color:var(--success);">6h 32m</div></div>
+            <div><div style="font-size:11px;color:var(--gray-500);">Idle Time</div><div style="font-size:16px;font-weight:600;color:var(--warning);">3h 23m</div></div>
+            <div><div style="font-size:11px;color:var(--gray-500);">Blocked Time</div><div style="font-size:16px;font-weight:600;color:var(--danger);">0m</div></div>
+          </div>
+        `;
+      }
+
+      document.getElementById('reportModal').classList.add('open');
+    }
+
+    function closeReport() {
+      document.getElementById('reportModal').classList.remove('open');
+    }
+
+    // ===== SIDEBAR TOGGLE =====
+    document.getElementById('toggleSidebar').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    });
+
+    // ===== FILTERS =====
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentFilter = chip.dataset.filter;
+        renderVehicleList();
+      });
+    });
+
+    // ===== SEARCH =====
+    document.getElementById('vehicleSearch').addEventListener('input', renderVehicleList);
+    document.getElementById('globalSearch').addEventListener('input', (e) => {
+      document.getElementById('vehicleSearch').value = e.target.value;
+      renderVehicleList();
+    });
+
+    // ===== DETAIL CLOSE =====
+    document.getElementById('detailClose').addEventListener('click', closeDetailPanel);
+
+    // ===== INIT =====
+    initMap();
+    renderVehicleList();
+  </script>
+</body>
+</html>
